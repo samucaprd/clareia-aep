@@ -149,4 +149,15 @@ public class SessaoMonitoriaDAO {
             throw new SQLException("Dados invalidos na sessao " + id + ": " + e.getMessage(), e);
         }
     }
+        public int contarInscricoesAtivas(int sessaoId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM inscricoes WHERE sessao_id = ? AND status = 'ATIVA'";
+        try (Connection conexao = banco.abrirConexao();
+             PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, sessaoId);
+            try (ResultSet resultado = comando.executeQuery()) {
+                resultado.next();
+                return resultado.getInt(1);
+            }
+        }
+    }
 }
