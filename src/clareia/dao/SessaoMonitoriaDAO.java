@@ -160,4 +160,100 @@ public class SessaoMonitoriaDAO {
             }
         }
     }
+        public boolean excluir(int sessaoId, int monitorId) throws SQLException {
+        String sql = "DELETE FROM sessoes_monitoria WHERE id = ? AND monitor_id = ? "
+                + "AND TIMESTAMP(data, hora_inicio) > CURRENT_TIMESTAMP "
+                + "AND NOT EXISTS (SELECT 1 FROM inscricoes WHERE sessao_id = ?)";
+        try (Connection conexao = banco.abrirConexao();
+             PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, sessaoId);
+            comando.setInt(2, monitorId);
+            comando.setInt(3, sessaoId);
+            return comando.executeUpdate() == 1;
+        }
+    }
+        public boolean atualizar(SessaoMonitoria sessao, int responsavelId) throws SQLException {
+        String modalidade;
+        String sala = null;
+        String link = null;
+        if (sessao instanceof SessaoPresencial) {
+            modalidade = "PRESENCIAL";
+            sala = ((SessaoPresencial) sessao).getSala();
+        } else if (sessao instanceof SessaoRemota) {
+            modalidade = "REMOTA";
+            link = ((SessaoRemota) sessao).getLinkAcesso();
+        } else {
+            throw new IllegalArgumentException("Modalidade invalida.");
+        }
+        String sql = "UPDATE sessoes_monitoria SET disciplina_id = ?, monitor_id = ?, modalidade = ?, sala = ?, link_acesso = ?, data = ?, hora_inicio = ?, hora_fim = ?, capacidade = ? "
+                + "WHERE id = ? AND monitor_id = ? AND status = ? "
+                + "AND TIMESTAMP(data, hora_inicio) > CURRENT_TIMESTAMP "
+                + "AND ? >= (SELECT COUNT(*) FROM inscricoes WHERE sessao_id = ? AND status = 'ATIVA') "
+                + "AND (NOT EXISTS (SELECT 1 FROM inscricoes WHERE sessao_id = ?) "
+                + "OR (disciplina_id = ? AND monitor_id = ? AND data = ? AND hora_inicio = ? AND hora_fim = ? AND modalidade = ?)) "
+                + "AND EXISTS (SELECT 1 FROM usuarios WHERE id = ? AND habilitado_monitor = TRUE)";
+        try (Connection conexao = banco.abrirConexao()) {
+            conexao.setAutoCommit(false);
+            try {
+                try (PreparedStatement comando = conexao.prepareStatement("SELECT id FROM sessoes_monitoria WHERE id = ? FOR UPDATE")) {
+                    comando.setInt(1, sessao.getId());
+                    try (ResultSet resultado = comando.executeQuery()) {
+                        if (!resultado.next()) {
+                            conexao.rollback();
+                            return false;
+                        }
+                    }
+                }
+                try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+                    comando.setInt(1, sessao.getDisciplina().getId());
+                    comando.setInt(2, sessao.getMonitor().getId());
+                    comando.setString(3, modalidade);
+                    comando.setString(4, sala);
+                    comando.setString(5, link);
+                    comando.setDate(6, java.sql.Date.valueOf(sessao.getData()));
+                    comando.setTime(7, java.sql.Time.valueOf(sessao.getHoraInicio()));
+                    comando.setTime(8, java.sql.Time.valueOf(sessao.getHoraFim()));
+                    comando.setInt(9, sessao.getCapacidade());
+                    comando.setInt(10, sessao.getId());
+                    comando.setInt(11, responsavelId);
+                    comando.setString(12, sessao.getStatus().name());
+                    comando.setInt(13, sessao.getCapacidade());
+                    comando.setInt(14, sessao.getId());
+                    comando.setInt(15, sessao.getId());
+                    comando.setInt(16, sessao.getDisciplina().getId());
+                    comando.setInt(17, sessao.getMonitor().getId());
+                    comando.setDate(18, java.sql.Date.valueOf(sessao.getData()));
+                    comando.setTime(19, java.sql.Time.valueOf(sessao.getHoraInicio()));
+                    comando.setTime(20, java.sql.Time.valueOf(sessao.getHoraFim()));
+                    comando.setString(21, modalidade);
+                    comando.setInt(22, sessao.getMonitor().getId());
+                    if (comando.executeUpdate() != 1) {
+                        conexao.rollback();
+                        return false;
+                    }
+                }
+                try (PreparedStatement comando = conexao.prepareStatement("DELETE FROM itens_pauta WHERE sessao_id = ?")) {
+                    comando.setInt(1, sessao.getId());
+                    comando.executeUpdate();
+                }
+                try (PreparedStatement comando = conexao.prepareStatement("INSERT INTO itens_pauta (sessao_id, ordem, descricao) VALUES (?, ?, ?)")) {
+                    for (ItemPauta item : sessao.getPauta()) {
+                        comando.setInt(1, sessao.getId());
+                        comando.setInt(2, item.getOrdem());
+                        comando.setString(3, item.getDescricao());
+                        comando.executeUpdate();
+                    }
+                }
+                conexao.commit();
+                return true;
+            } catch (SQLException | RuntimeException e) {
+                try {
+                    conexao.rollback();
+                } catch (SQLException erroRollback) {
+                    e.addSuppressed(erroRollback);
+                }
+                throw e;
+            }
+        }
+    }
 }

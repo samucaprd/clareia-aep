@@ -110,4 +110,60 @@ public class SessaoMonitoriaService {
         int inscricoesAtivas = sessaoDAO.contarInscricoesAtivas(sessaoId);
         return Math.max(0, sessao.getCapacidade() - inscricoesAtivas);
     }
+        public void excluir(int sessaoId, int usuarioResponsavelId) throws SQLException {
+        SessaoMonitoria sessao = buscarPorId(sessaoId);
+        if (sessao.getMonitor().getId() != usuarioResponsavelId) {
+            throw new IllegalArgumentException("Somente o monitor responsavel pode excluir a sessao.");
+        }
+        LocalDateTime inicio = LocalDateTime.of(sessao.getData(), sessao.getHoraInicio());
+        if (!inicio.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("A sessao so pode ser excluida antes do inicio.");
+        }
+        if (!sessaoDAO.excluir(sessaoId, usuarioResponsavelId)) {
+            throw new IllegalArgumentException("Exclusao nao realizada. Verifique se existem inscricoes ou se a sessao foi alterada ou iniciada.");
+        }
+    }
+        public void editar(SessaoMonitoria alterada, int usuarioResponsavelId) throws SQLException {
+        if (alterada == null) {
+            throw new IllegalArgumentException("A sessao deve ser informada.");
+        }
+        SessaoMonitoria atual = buscarPorId(alterada.getId());
+        if (atual.getMonitor().getId() != usuarioResponsavelId) {
+            throw new IllegalArgumentException("Somente o monitor responsavel pode editar a sessao.");
+        }
+        LocalDateTime inicioAtual = LocalDateTime.of(atual.getData(), atual.getHoraInicio());
+        if (!inicioAtual.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("A sessao so pode ser editada antes do inicio.");
+        }
+        LocalDateTime novoInicio = LocalDateTime.of(alterada.getData(), alterada.getHoraInicio());
+        if (!novoInicio.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("O novo inicio deve estar no futuro.");
+        }
+        if (alterada.getStatus() != atual.getStatus()) {
+            throw new IllegalArgumentException("Use a operacao especifica para cancelar ou concluir a sessao.");
+        }
+        boolean disciplinaExiste = false;
+        for (Disciplina disciplina : disciplinaDAO.listar()) {
+            if (disciplina.getId() == alterada.getDisciplina().getId()) {
+                disciplinaExiste = true;
+                break;
+            }
+        }
+        if (!disciplinaExiste) {
+            throw new IllegalArgumentException("A disciplina deve estar cadastrada.");
+        }
+        boolean monitorValido = false;
+        for (Usuario usuario : usuarioDAO.listar()) {
+            if (usuario.getId() == alterada.getMonitor().getId() && usuario.isHabilitadoMonitor()) {
+                monitorValido = true;
+                break;
+            }
+        }
+        if (!monitorValido) {
+            throw new IllegalArgumentException("O monitor deve estar cadastrado e habilitado.");
+        }
+        if (!sessaoDAO.atualizar(alterada, usuarioResponsavelId)) {
+            throw new IllegalArgumentException("Edicao nao realizada. Verifique as restricoes de inscricoes, capacidade, horario e responsavel.");
+        }
+    }
 }
