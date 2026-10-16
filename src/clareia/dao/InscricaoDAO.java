@@ -9,6 +9,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import clareia.model.StatusInscricao;
+import clareia.model.StatusPresenca;
+import java.util.ArrayList;
+import java.util.List;
 
 public class InscricaoDAO {
     public Usuario bloquearEstudante(Connection conexao, int estudanteId) throws SQLException {
@@ -108,6 +112,45 @@ public class InscricaoDAO {
         try (PreparedStatement comando = conexao.prepareStatement(sql)) {
             comando.setInt(1, sessaoId);
             return comando.executeUpdate();
+        }
+    }
+        public List<Inscricao> listarPorSessao(Connection conexao, int sessaoId, SessaoMonitoriaDAO sessaoDAO) throws SQLException {
+        return consultar(conexao, "i.sessao_id", sessaoId, sessaoDAO);
+    }
+    public List<Inscricao> listarPorEstudante(Connection conexao, int estudanteId, SessaoMonitoriaDAO sessaoDAO) throws SQLException {
+        return consultar(conexao, "i.estudante_id", estudanteId, sessaoDAO);
+    }
+    public Inscricao buscarPorId(Connection conexao, int id, SessaoMonitoriaDAO sessaoDAO) throws SQLException {
+        List<Inscricao> inscricoes = consultar(conexao, "i.id", id, sessaoDAO);
+        if (inscricoes.isEmpty()) {
+            return null;
+        }
+        return inscricoes.get(0);
+    }
+    private List<Inscricao> consultar(Connection conexao, String coluna, int valor, SessaoMonitoriaDAO sessaoDAO) throws SQLException {
+        List<Inscricao> inscricoes = new ArrayList<>();
+        String sql = "SELECT i.*, u.nome_completo, u.matricula, u.email, u.habilitado_monitor "
+                + "FROM inscricoes i JOIN usuarios u ON u.id = i.estudante_id "
+                + "WHERE " + coluna + " = ? ORDER BY i.data_criacao, i.id";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, valor);
+            try (ResultSet resultado = comando.executeQuery()) {
+                while (resultado.next()) {
+                    Usuario estudante = new Usuario(resultado.getInt("estudante_id"), resultado.getString("nome_completo"), resultado.getString("matricula"), resultado.getString("email"), resultado.getBoolean("habilitado_monitor"));
+                    SessaoMonitoria sessao = sessaoDAO.buscarPorId(conexao, resultado.getInt("sessao_id"));
+                    Inscricao inscricao = new Inscricao(resultado.getInt("id"), estudante, sessao, resultado.getTimestamp("data_criacao").toLocalDateTime(), StatusInscricao.valueOf(resultado.getString("status")), StatusPresenca.valueOf(resultado.getString("presenca")));
+                    inscricoes.add(inscricao);
+                }
+            }
+        }
+        return inscricoes;
+    }
+    public boolean atualizarPresenca(Connection conexao, Inscricao inscricao) throws SQLException {
+        String sql = "UPDATE inscricoes SET presenca = ? WHERE id = ? AND status = 'ATIVA'";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setString(1, inscricao.getPresenca().name());
+            comando.setInt(2, inscricao.getId());
+            return comando.executeUpdate() == 1;
         }
     }
 }
