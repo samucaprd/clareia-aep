@@ -281,4 +281,16 @@ public class SessaoMonitoriaDAO {
             return comando.executeUpdate() == 1;
         }
     }
+        public boolean concluir(Connection conexao, int sessaoId, int monitorId) throws SQLException {
+        String sql = "UPDATE sessoes_monitoria SET status = 'CONCLUIDA' "
+                + "WHERE id = ? AND monitor_id = ? AND status = 'AGENDADA' "
+                + "AND TIMESTAMP(data, hora_fim) < CURRENT_TIMESTAMP "
+                + "AND NOT EXISTS (SELECT 1 FROM inscricoes WHERE sessao_id = ? AND status = 'ATIVA' AND presenca = 'PENDENTE')";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, sessaoId);
+            comando.setInt(2, monitorId);
+            comando.setInt(3, sessaoId);
+            return comando.executeUpdate() == 1;
+        }
+    }
 }

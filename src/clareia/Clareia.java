@@ -115,6 +115,9 @@ public class Clareia {
                     case "16":
                         registrarPresenca();
                         break;
+                    case "17":
+                        concluirSessao();
+                        break;
                     case "0":
                         System.out.println("Clareia encerrado.");
                         return;
@@ -158,6 +161,7 @@ public class Clareia {
         System.out.println("14 - Cancelar sessao");
         System.out.println("15 - Consultar inscritos de uma sessao");
         System.out.println("16 - Registrar presenca ou ausencia");
+        System.out.println("17 - Concluir sessao");
         System.out.println("0 - Sair");
     }
     private String ler(String mensagem) {
@@ -406,6 +410,14 @@ public class Clareia {
             System.out.println("Disciplina: " + sessao.getDisciplina().getNome());
             System.out.println("Data: " + sessao.getData() + " | Horario: " + sessao.getHoraInicio() + " ate " + sessao.getHoraFim());
             System.out.println("Presenca: " + inscricao.getPresenca());
+        }
+    }
+        private void concluirSessao() throws SQLException {
+        Usuario monitor = exigirMonitor();
+        int id = lerInteiro("ID da sessao: ");
+        if (confirmar("Concluir esta sessao?")) {
+            presencaService.concluirSessao(id, monitor.getId());
+            System.out.println("Sessao concluida.");
         }
     }
 }

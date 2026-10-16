@@ -93,4 +93,50 @@ public class PresencaService {
             }
         }
     }
+        public void concluirSessao(int sessaoId, int monitorId) throws SQLException {
+        if (sessaoId <= 0 || monitorId <= 0) {
+            throw new IllegalArgumentException("Informe IDs validos.");
+        }
+        try (Connection conexao = banco.abrirConexao()) {
+            conexao.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            conexao.setAutoCommit(false);
+            try {
+                if (!inscricaoDAO.bloquearSessao(conexao, sessaoId)) {
+                    throw new IllegalArgumentException("Sessao nao encontrada.");
+                }
+                SessaoMonitoria sessao = sessaoDAO.buscarPorId(conexao, sessaoId);
+                if (sessao == null) {
+                    throw new IllegalArgumentException("Sessao nao encontrada.");
+                }
+                if (sessao.getMonitor().getId() != monitorId) {
+                    throw new IllegalArgumentException("Somente o monitor responsavel pode concluir a sessao.");
+                }
+                if (sessao.getStatus() != StatusSessao.AGENDADA) {
+                    throw new IllegalArgumentException("Somente sessoes agendadas podem ser concluidas.");
+                }
+                LocalDateTime termino = LocalDateTime.of(sessao.getData(), sessao.getHoraFim());
+                if (!LocalDateTime.now().isAfter(termino)) {
+                    throw new IllegalArgumentException("A sessao so pode ser concluida apos o termino.");
+                }
+                List<Inscricao> inscricoes = inscricaoDAO.listarPorSessao(conexao, sessaoId, sessaoDAO);
+                for (Inscricao inscricao : inscricoes) {
+                    if (inscricao.getStatus() == StatusInscricao.ATIVA && inscricao.getPresenca() == StatusPresenca.PENDENTE) {
+                        throw new IllegalArgumentException("Registre a presenca ou ausencia de todos os inscritos ativos.");
+                    }
+                }
+                sessao.concluir();
+                if (!sessaoDAO.concluir(conexao, sessaoId, monitorId)) {
+                    throw new IllegalArgumentException("Nao foi possivel concluir a sessao. Verifique o horario e as presencas.");
+                }
+                conexao.commit();
+            } catch (SQLException | RuntimeException e) {
+                try {
+                    conexao.rollback();
+                } catch (SQLException erroRollback) {
+                    e.addSuppressed(erroRollback);
+                }
+                throw e;
+            }
+        }
+    }
 }
