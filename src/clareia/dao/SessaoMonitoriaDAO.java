@@ -272,4 +272,13 @@ public class SessaoMonitoriaDAO {
             }
         }
     }
+        public boolean cancelar(Connection conexao, int sessaoId, int monitorId) throws SQLException {
+        String sql = "UPDATE sessoes_monitoria SET status = 'CANCELADA' WHERE id = ? AND monitor_id = ? "
+                + "AND status = 'AGENDADA' AND TIMESTAMP(data, hora_inicio) > CURRENT_TIMESTAMP";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, sessaoId);
+            comando.setInt(2, monitorId);
+            return comando.executeUpdate() == 1;
+        }
+    }
 }

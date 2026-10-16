@@ -82,4 +82,32 @@ public class InscricaoDAO {
             throw new SQLException("Nao foi possivel recuperar o ID da inscricao.");
         }
     }
+        public Integer buscarSessaoDaInscricao(Connection conexao, int inscricaoId, int estudanteId) throws SQLException {
+        String sql = "SELECT sessao_id FROM inscricoes WHERE id = ? AND estudante_id = ?";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, inscricaoId);
+            comando.setInt(2, estudanteId);
+            try (ResultSet resultado = comando.executeQuery()) {
+                if (resultado.next()) {
+                    return resultado.getInt("sessao_id");
+                }
+                return null;
+            }
+        }
+    }
+    public boolean cancelarInscricao(Connection conexao, int inscricaoId, int estudanteId) throws SQLException {
+        String sql = "UPDATE inscricoes SET status = 'CANCELADA' WHERE id = ? AND estudante_id = ? AND status = 'ATIVA'";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, inscricaoId);
+            comando.setInt(2, estudanteId);
+            return comando.executeUpdate() == 1;
+        }
+    }
+    public int cancelarAtivasDaSessao(Connection conexao, int sessaoId) throws SQLException {
+        String sql = "UPDATE inscricoes SET status = 'CANCELADA' WHERE sessao_id = ? AND status = 'ATIVA'";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, sessaoId);
+            return comando.executeUpdate();
+        }
+    }
 }
