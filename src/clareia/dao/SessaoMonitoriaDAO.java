@@ -256,4 +256,20 @@ public class SessaoMonitoriaDAO {
             }
         }
     }
+        public SessaoMonitoria buscarPorId(Connection conexao, int id) throws SQLException {
+        String sql = "SELECT s.*, d.codigo AS disciplina_codigo, d.nome AS disciplina_nome, "
+                + "u.nome_completo, u.matricula, u.email, u.habilitado_monitor "
+                + "FROM sessoes_monitoria s "
+                + "JOIN disciplinas d ON d.id = s.disciplina_id "
+                + "JOIN usuarios u ON u.id = s.monitor_id WHERE s.id = ?";
+        try (PreparedStatement comando = conexao.prepareStatement(sql)) {
+            comando.setInt(1, id);
+            try (ResultSet resultado = comando.executeQuery()) {
+                if (resultado.next()) {
+                    return montarSessao(conexao, resultado);
+                }
+                return null;
+            }
+        }
+    }
 }
